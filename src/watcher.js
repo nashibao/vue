@@ -6,18 +6,20 @@ var batcher = require('./batcher')
 var uid = 0
 
 /**
- * A watcher parses an expression, collects dependencies,
- * and fires callback when the expression value changes.
+ * A watcher watches an expression (compiled into a getter)
+ * or a raw getter function, collects dependencies, and
+ * fires callback when the expression value changes.
  * This is used for both the $watch() api and directives.
  *
  * @param {Vue} vm
- * @param {String} expression
+ * @param {String|Function} expOrFn
  * @param {Function} cb
  * @param {Object} options
  *                 - {Array} filters
  *                 - {Boolean} twoWay
  *                 - {Boolean} deep
  *                 - {Boolean} user
+ *                 - {Boolean} sync
  *                 - {Function} [preProcess]
  * @constructor
  */
@@ -34,6 +36,7 @@ function Watcher (vm, expOrFn, cb, options) {
   this.deep = !!options.deep
   this.user = !!options.user
   this.twoWay = !!options.twoWay
+  this.sync = !!options.sync
   this.filters = options.filters
   this.preProcess = options.preProcess
   this.deps = []
@@ -160,7 +163,7 @@ p.afterGet = function () {
  */
 
 p.update = function () {
-  if (!config.async) {
+  if (!config.async || this.sync) {
     this.run()
   } else {
     batcher.push(this)

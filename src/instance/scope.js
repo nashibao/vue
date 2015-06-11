@@ -1,6 +1,7 @@
 var _ = require('../util')
 var Observer = require('../observer')
 var Dep = require('../observer/dep')
+var Watcher = require('../watcher')
 
 /**
  * Setup the scope of an instance, which contains:
@@ -164,11 +165,11 @@ exports._initComputed = function () {
         configurable: true
       }
       if (typeof userDef === 'function') {
-        def.get = _.bind(userDef, this)
+        def.get = makeComputedGetter(userDef, this)
         def.set = noop
       } else {
         def.get = userDef.get
-          ? _.bind(userDef.get, this)
+          ? makeComputedGetter(userDef.get, this)
           : noop
         def.set = userDef.set
           ? _.bind(userDef.set, this)
@@ -176,6 +177,44 @@ exports._initComputed = function () {
       }
       Object.defineProperty(this, key, def)
     }
+  }
+}
+
+/**
+ * Make a computed property getter
+ */
+
+function makeComputedGetter (getter, owner) {
+  var initialized = false
+  var dep = new Dep()
+  var watcher, value
+  return function computedGetter () {
+    if (!initialized) {
+      // lazy init the watcher, so that it doesn't
+      // evaluate the getter when instance is just created.
+      // we need to save the current target watcher so that
+      // it doesn't get overwritten.
+      var target = Dep.target
+      initialized = true
+      watcher = new Watcher(
+        owner,
+        getter,
+        function (newValue) {
+          value = newValue
+          dep.notify()
+        },
+        {
+          // important: the computed watcher must be in
+          // sync mode so that it's updated immediately
+          // after a dependency changes.
+          sync: true
+        }
+      )
+      value = watcher.value
+      Dep.target = target
+    }
+    dep.depend()
+    return value
   }
 }
 
